@@ -70,7 +70,7 @@ uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
 /**
- * Setup all pins in the switch matrix of the LPC810
+ * Setup all pins in the switch matrix of the LPC812
  */
 void configurePins() {
     /* Enable SWM clock */
@@ -78,17 +78,20 @@ void configurePins() {
     
     /* Pin Assign 8 bit Configuration */
     /* U0_TXD */
-    LPC_SWM->PINASSIGN0 = 0xffffff00UL;
+    /* U0_RXD */
+    LPC_SWM->PINASSIGN0 = 0xffff0004UL;
     /* SPI0_SCK */
-    LPC_SWM->PINASSIGN3 = 0x02ffffffUL;
+    LPC_SWM->PINASSIGN3 = 0x01ffffffUL;
     /* SPI0_MOSI */
     /* SPI0_MISO */
     /* SPI0_SSEL */
-    LPC_SWM->PINASSIGN4 = 0xff050304UL;
+    LPC_SWM->PINASSIGN4 = 0xff0f0809UL;
     
     /* Pin Assign 1 bit Configuration */
-    /* ACMP_I2 */
-    LPC_SWM->PINENABLE0 = 0xfffffffdUL;
+    /* SWCLK */
+    /* SWDIO */
+    /* RESET */
+    LPC_SWM->PINENABLE0 = 0xffffffb3UL;
     
 }
 
