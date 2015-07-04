@@ -47,10 +47,6 @@
     #include "uart.h"
 #endif
 
-#ifdef ADC
-    #include "adc.h"
-#endif
-
 #ifdef ZOMBIE
     #include "zombie.h"
 #endif
@@ -315,11 +311,6 @@ int main(void)
     printf("Node Booted\r\n");
 #endif
     
-#ifdef ADC
-    /* Initialise the comparator ICMP_2 */
-    LPC_SYSCON->PDRUNCFG &= ~((1 << 15)); // power up ACMP
-#endif
-    
     //Seed random number generator, we can use our 'unique' ID
     random_output = NODE_ID[0] + NODE_ID[1] + NODE_ID[2];
     
@@ -349,11 +340,6 @@ int main(void)
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
-        
-#ifdef ADC
-        //Read ADC
-        adc_result = read_adc2();
-#endif
 
 #ifdef BrownOut
         adc_result = acmpVccEstimate();
@@ -375,8 +361,6 @@ int main(void)
             
 #ifdef DEBUG
             n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
-#elif defined(ADC)
-            n = sprintf(data_temp, "%d%cT%dR%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, adc_result, NODE_ID);
 #elif defined(BrownOut)
             n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 #else

@@ -43,7 +43,6 @@ UKHASNET_OBJS = main.o \
                 mrt.o \
                 printf.o \
                 string.o \
-                adc.o \
                 zombie.o \
                 printf-retarget.o \
                 system_LPC8xx.o \
