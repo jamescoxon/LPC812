@@ -43,12 +43,8 @@
 #include "spi.h"
 #include "rfm69.h"
 
-#ifdef defined(GATEWAY) || defined(DEBUG) || defined(GPS)
+#ifdef defined(GATEWAY) || defined(DEBUG)
     #include "uart.h"
-#endif
-
-#ifdef GPS
-    #include "gps.h"
 #endif
 
 #ifdef ADC
@@ -298,11 +294,8 @@ int main(void)
 #ifdef BrownOut
     LPC_SYSCON->BODCTRL = 0x11;  //Should be set to Level 1 (Assertion 2.3V, De-assertion 2.4V) reset
 #endif
-    
-#ifdef GPS
-    // Initialise the UART0 block for printf output
-    uart0Init(9600);
-#elif defined(GATEWAY) || defined(DEBUG)
+
+#ifdef defined(GATEWAY) || defined(DEBUG)
     // Initialise the UART0 block for printf output
     uart0Init(115200);
 #endif
@@ -338,33 +331,11 @@ int main(void)
     sleepMicro(60000);
 #endif
     
-#ifdef GPS
-		int navmode = 9;
-		setupGPS();
-#endif
-    
 #ifdef DEBUG
 		printf("Node initialized, version %s\r\n",GIT_VER);
 #endif
     
     while(1) {
-        
-#ifdef GPS
-			mrtDelay(5000);
-			navmode = gps_check_nav();
-            if (navmode != 6){
-                setupGPS();
-            }
-        
-			mrtDelay(500);
-			gps_get_position();
-			mrtDelay(500);
-			gps_check_lock();
-			mrtDelay(500);
-
-			//printf("Data: %d,%d,%d,%d,%d,%d\r\n", lat, lon, alt, navmode, lock, sats);
-			//printf("Errors: %d,%d\r\n", GPSerror, serialBuffer_write);
-#endif
         
         incrementPacketCount();
         
@@ -402,9 +373,7 @@ int main(void)
         }
         else {
             
-#ifdef GPS
-            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, NODE_ID);
-#elif defined(DEBUG)
+#ifdef DEBUG
             n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
 #elif defined(ADC)
             n = sprintf(data_temp, "%d%cT%dR%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, adc_result, NODE_ID);

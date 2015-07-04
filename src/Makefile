@@ -38,7 +38,6 @@ CFLAGS += -DGIT_VER="\"${GIT_VER}\""
 UKHASNET_OBJS = main.o \
                 gpio.o \
                 uart.o \
-                gps.o \
                 spi.o \
                 rfm69.o \
                 mrt.o \
