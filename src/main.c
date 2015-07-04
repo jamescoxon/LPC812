@@ -51,11 +51,6 @@
     #include "zombie.h"
 #endif
 
-#ifdef SERIAL_IN
-    #include "uart.h"
-    char data_out_temp[MAX_TX_CHARS+1];
-#endif
-
 char data_temp[66];
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
@@ -86,45 +81,6 @@ void configurePins() {
     LPC_SWM->PINENABLE0 = 0xffffffb3UL;
     
 }
-
-#ifdef SERIAL_IN
-/**
- * Checks for incoming serial data which will be send by radio. This function
- * also checks the buffers length to avoid a stackoverflow at the radio FIFO.
- */
-inline void checkTxBuffer(void) {
-	uint8_t i;
-
-	if(UART0_available() > 0) {
-		for(i=0; i<serialBuffer_write; i++) {
-
-			if(serialBuffer[i] == '\r' ||  serialBuffer[i] == '\n' || strlen(data_out_temp) >= 32) { // Transmit data from buffer
-
-				#ifdef DEBUG
-				if(strlen(data_out_temp) >= MAX_TX_CHARS)
-					printf("max. buffer exceeded\r\n");
-				#endif
-
-				// Transmit data
-				incrementPacketCount();
-
-				uint8_t n;
-				data_temp[0] = '\0';
-
-				n = sprintf(data_temp, "%d%c%s[%s]", NUM_REPEATS, data_count, data_out_temp, NODE_ID);
-				transmitData(n);
-
-				data_out_temp[0] = '\0'; // Flush buffer
-
-			} else {
-				sprintf(data_out_temp, "%s%c", data_out_temp, serialBuffer[i]); // Read from serial buffer
-			}
-
-		}
-		serialBuffer_write = 0;
-	}
-}
-#endif
 
 /**
  * Packet data transmission
@@ -256,11 +212,6 @@ void awaitData(int countdown) {
             data_temp[rx_len - 1] = '\0';
             processData(rx_len);
         }
-
-        #ifdef SERIAL_IN
-                // Check tx buffer
-                checkTxBuffer();
-        #endif
 
         countdown--;
         mrtDelay(100);
