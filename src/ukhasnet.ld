@@ -1,5 +1,5 @@
 /*
- * generic gcc linker script for LPC810
+ * generic gcc linker script for LPC812
  * Kamal Mostafa <kamal@whence.com>.
  *
  * License: Public Domain
@@ -7,9 +7,10 @@
 
 MEMORY
 {
+/* From https://github.com/sebseb7/lpc8xx/blob/master/core/lpc812.ld */
     /* NXP LPC810 */
-    FLASH (rx) : ORIGIN = 0x00000000, LENGTH = 0x00001000 /* 4 Kbytes */
-    RAM (rwx) :  ORIGIN = 0x10000000, LENGTH = 0x00000400 /* 1 Kbyte */
+    FLASH (rx) : ORIGIN = 0x0, LENGTH = 0x4000 /* 16k */
+    RAM (rwx) :  ORIGIN = 0x10000000, LENGTH = 0x1000 /* 4k */
 }
 
 SECTIONS
