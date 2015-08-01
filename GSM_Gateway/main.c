@@ -137,6 +137,7 @@ inline void processData(uint32_t len) {
         
 #ifdef GATEWAY
         printf("rx: %s|%d\r\n",data_temp, RFM69_lastRssi());
+        GSM_upload();
 #endif
         //Reduce the repeat value
         data_temp[0] = data_temp[0] - 1;
@@ -285,7 +286,7 @@ void GSM_upload(){
     printf("AT+CMGF=1"); //
     printf("AT+CMGS=\”+XXXXXXXXXXX\”\r");
     mrtDelay(1000);
-    printf("%s\r", data_temp);
+    printf("%s|%d\r\n",data_temp, RFM69_lastRssi());
     mrtDelay(500);
     uart0SendByte(0x1A);
     
