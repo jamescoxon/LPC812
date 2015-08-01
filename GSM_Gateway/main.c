@@ -47,15 +47,17 @@
     #include "uart.h"
 #endif
 
-#ifdef ZOMBIE
-    #include "zombie.h"
-#endif
 
 char data_temp[66];
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
+
+uint8_t gsm_buf[80]; //GSM receive buffer
+
+#define GSM_PWR    (2)
+
 /**
  * Setup all pins in the switch matrix of the LPC812
  */
@@ -93,20 +95,12 @@ void transmitData(uint8_t i) {
         printf("rx: %s|0\r\n", data_temp);
 #endif
 
-#ifdef ZOMBIE_MODE
-    // Transmit the data (need to include the length of the packet and power in dbmW)
-    RFM69_send(data_temp, i, POWER_OUTPUT);
-
-
-    RFM69_setMode(RFM69_MODE_SLEEP);
-#else
     
     // Transmit the data (need to include the length of the packet and power in dbmW)
     RFM69_send(data_temp, i, POWER_OUTPUT);
     
     //Ensure we are in RX mode
     RFM69_setMode(RFM69_MODE_RX);
-#endif
 
 }
 
@@ -231,13 +225,73 @@ void incrementPacketCount(void) {
     }
 }
 
+void GSM_On(){
+    //Check if modem is on
+    
+    LPC_GPIO_PORT->SET0 = 1 << GSM_PWR;
+    mrtDelay(2000); //Wait for modem to boot
+    LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
+}
+
+uint8_t GSM_AT(){
+    printf("AT\r");
+    GSM_get_data(500);
+    if (gsm_buf[0] == 'O' && gsm_buf[1] == 'K'){
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+void GSM_upload(){
+    //Turn on Modem
+    GSM_On();
+    
+    //Check Modem is online
+    GSM_AT();
+    
+    //Setup Modem
+    
+    //Check whether GPRS/3G
+    
+    //If GSM send as a SMS
+    printf("AT+CMGF=1"); //
+    printf("AT+CMGS=\”+447748628528\”\r");
+    mrtDelay(1000);
+    printf("%s\r", data_temp);
+    mrtDelay(500);
+    uart0SendByte(0x1A);
+    uart0SendByte(0x0D);
+    uart0SendByte(0x0A);
+    
+    
+    //Else GPRS + then send as data
+    
+    //Disconnect and turn off Modem
+    LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
+    
+    //
+}
+
+void GSM_get_data(uint16_t timeout){
+    uint8_t i;
+    uint16_t x = 0;
+    while (x < timeout){
+        if(UART0_available() > 0){
+            for(i=0; i<serialBuffer_write; i++){
+                gsm_buf[i] = serialBuffer[i];
+            }
+            serialBuffer_write = 0;
+        }
+        mrtDelay(1);
+        x++;
+    }
+}
 
 
 int main(void)
 {
-#ifdef ZOMBIE_MODE
-    LPC_SYSCON->BODCTRL = 0x11;  //Should be set to Level 1 (Assertion 2.3V, De-assertion 2.4V) reset
-#endif
 
 #ifdef DEBUG
     // Initialise the UART0 block for printf output
@@ -254,21 +308,14 @@ int main(void)
     // Configure the switch matrix (setup pins for UART0 and SPI)
     configurePins();
     
+    LPC_GPIO_PORT->DIR0 |= (1 << GSM_PWR);
+    
     RFM69_init();
     
 #ifdef DEBUG
     mrtDelay(100);
     printf("Node Booted\r\n");
     mrtDelay(100);
-#endif
-
-    
-#ifdef ZOMBIE_MODE
-    //This is to allow the setup to recover from the initial boot and
-    // avoid a loop
-    RFM69_setMode(RFM69_MODE_SLEEP);
-    init_sleep();
-    sleepMicro(20000);
 #endif
     
 #ifdef DEBUG
@@ -280,19 +327,6 @@ int main(void)
 
 
     while(1) {
-
-#ifdef ZOMBIE_MODE
-        adc_result = acmpVccEstimate();
-        // Before transmitting if the input V is too low we could sleep again
-        if (adc_result < 3100 || adc_result > 10000) {
-            sleepRadio();
-        }
-#endif
-        
-#ifdef DEBUG
-        printf("ADC: %d\r\n", adc_result);
-        
-#endif
         
         incrementPacketCount();
         
@@ -303,13 +337,11 @@ int main(void)
         //Create the packet
         int int_temp;
 
-#ifndef ZOMBIE_MODE
         int_temp = RFM69_readTemp(); // Read transmitter temperature
         rx_rssi = RFM69_lastRssi();
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
-#endif
 
         if(data_count == 97) {
             n = sprintf(data_temp, "%d%cL%s[%s]", NUM_REPEATS, data_count, LOCATION_STRING, NODE_ID);
@@ -318,8 +350,6 @@ int main(void)
             
 #ifdef DEBUG
             n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
-#elif defined(ZOMBIE_MODE)
-            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 #else
             n = sprintf(data_temp, "%d%cT%dR%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, NODE_ID);
 #endif
@@ -327,11 +357,7 @@ int main(void)
         
         transmitData(n);
 
-#ifdef ZOMBIE_MODE
-        sleepRadio();
-#else
         awaitData(TX_GAP);
-#endif
     
          }
     
