@@ -225,17 +225,29 @@ void incrementPacketCount(void) {
     }
 }
 
-void GSM_On(){
-    //Check if modem is on
+//GSM Code **********************************************
+void GSM_get_data(uint16_t timeout){
+    uint8_t i;
+    uint16_t x = 0;
     
-    LPC_GPIO_PORT->SET0 = 1 << GSM_PWR;
-    mrtDelay(2000); //Wait for modem to boot
-    LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
+    while (x < timeout){
+        if(UART0_available() > 0){
+            for(i=0; i<serialBuffer_write; i++){
+                gsm_buf[i] = serialBuffer[i];
+                if (gsm_buf[i] == '\r'){
+                    return;
+                }
+            }
+            serialBuffer_write = 0;
+        }
+        mrtDelay(1);
+        x++;
+    }
 }
 
 uint8_t GSM_AT(){
     printf("AT\r");
-    GSM_get_data(500);
+    GSM_get_data(1000);
     if (gsm_buf[0] == 'O' && gsm_buf[1] == 'K'){
         return 1;
     }
@@ -244,12 +256,26 @@ uint8_t GSM_AT(){
     }
 }
 
-void GSM_upload(){
-    //Turn on Modem
-    GSM_On();
+void GSM_On(){
+    //Check if modem is on
+    uint8_t x = 0;
     
-    //Check Modem is online
-    GSM_AT();
+    while((GSM_AT() == 0) && (x < 3)){
+    
+        LPC_GPIO_PORT->SET0 = 1 << GSM_PWR;
+        mrtDelay(2000); //Wait for modem to boot
+        LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
+        mrtDelay(2000);
+        
+        x++;
+    }
+}
+
+
+
+void GSM_upload(){
+    //Turn on Modem and check has booted
+    GSM_On();
     
     //Setup Modem
     
@@ -257,13 +283,11 @@ void GSM_upload(){
     
     //If GSM send as a SMS
     printf("AT+CMGF=1"); //
-    printf("AT+CMGS=\”+447748628528\”\r");
+    printf("AT+CMGS=\”+XXXXXXXXXXX\”\r");
     mrtDelay(1000);
     printf("%s\r", data_temp);
     mrtDelay(500);
     uart0SendByte(0x1A);
-    uart0SendByte(0x0D);
-    uart0SendByte(0x0A);
     
     
     //Else GPRS + then send as data
@@ -272,21 +296,6 @@ void GSM_upload(){
     LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
     
     //
-}
-
-void GSM_get_data(uint16_t timeout){
-    uint8_t i;
-    uint16_t x = 0;
-    while (x < timeout){
-        if(UART0_available() > 0){
-            for(i=0; i<serialBuffer_write; i++){
-                gsm_buf[i] = serialBuffer[i];
-            }
-            serialBuffer_write = 0;
-        }
-        mrtDelay(1);
-        x++;
-    }
 }
 
 
