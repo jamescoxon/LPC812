@@ -43,12 +43,12 @@
 #include "spi.h"
 #include "rfm69.h"
 
-#ifdef DEBUG
-    #include "uart.h"
+#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
+#include "uart.h"
 #endif
 
 
-char data_temp[66];
+char data_temp[66] = "test";
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
@@ -56,7 +56,7 @@ int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
 
 uint8_t gsm_buf[80]; //GSM receive buffer
 
-#define GSM_PWR    (2)
+#define GSM_PWR    (17)
 
 /**
  * Setup all pins in the switch matrix of the LPC812
@@ -69,6 +69,9 @@ void configurePins() {
     /* U0_TXD */
     /* U0_RXD */
     LPC_SWM->PINASSIGN0 = 0xffff0004UL;
+    /* U1_TXD */
+    /* U1_RXD */
+    LPC_SWM->PINASSIGN1 = 0xff0c0dffUL;
     /* SPI0_SCK */
     LPC_SWM->PINASSIGN3 = 0x01ffffffUL;
     /* SPI0_MOSI */
@@ -81,6 +84,8 @@ void configurePins() {
     /* SWDIO */
     /* RESET */
     LPC_SWM->PINENABLE0 = 0xffffffb3UL;
+    
+
 
     
 }
@@ -93,6 +98,7 @@ void transmitData(uint8_t i) {
 
 #ifdef GATEWAY
         printf("rx: %s|0\r\n", data_temp);
+    
 #endif
 
     
@@ -137,7 +143,6 @@ inline void processData(uint32_t len) {
         
 #ifdef GATEWAY
         printf("rx: %s|%d\r\n",data_temp, RFM69_lastRssi());
-        GSM_upload();
 #endif
         //Reduce the repeat value
         data_temp[0] = data_temp[0] - 1;
@@ -234,10 +239,13 @@ void GSM_get_data(uint16_t timeout){
     while (x < timeout){
         if(UART1_available() > 0){
             for(i=0; i<serial1Buffer_write; i++){
-                gsm_buf[i] = serial1Buffer[i];
-                if (gsm_buf[i] == '\r'){
-                    return;
-                }
+                //gsm_buf[i] = serial1Buffer[i];
+                uart0SendChar(serial1Buffer[i]);
+                
+                //if (gsm_buf[i] == '\r'){
+                //    printf("%s", gsm_buf);
+                //    return;
+                //}
             }
             serial1Buffer_write = 0;
         }
@@ -247,14 +255,17 @@ void GSM_get_data(uint16_t timeout){
 }
 
 void GSM_send_data(char *command, uint8_t uartport){
+    //printf("%s", command);
     uint8_t data_length = strlen(command);
     
     uartSend(command, data_length, uartport);
+    
+    GSM_get_data(3000);
 }
 
 uint8_t GSM_AT(){
     GSM_send_data("AT\r", 1);
-    GSM_get_data(1000);
+    GSM_get_data(2000);
     if (gsm_buf[0] == 'O' && gsm_buf[1] == 'K'){
         return 1;
     }
@@ -265,42 +276,43 @@ uint8_t GSM_AT(){
 
 void GSM_On(){
     //Check if modem is on
-    uint8_t x = 0;
+    //uint8_t x = 0;
     
-    while((GSM_AT() == 0) && (x < 3)){
+    //while((GSM_AT() == 0) && (x < 3)){
     
         LPC_GPIO_PORT->SET0 = 1 << GSM_PWR;
         mrtDelay(2000); //Wait for modem to boot
         LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
         mrtDelay(2000);
         
-        x++;
-    }
+      //  x++;
+    //}
+    //printf("GSM Booted");
 }
 
 
 void GSM_upload(){
     //Turn on Modem and check has booted
-    GSM_On();
+    //GSM_On();
     
     //Setup Modem
     
     //Check whether GPRS/3G
     
     //If GSM send as a SMS
-    GSM_send_data("AT+CMGF=1", 1); //
-    GSM_send_data("AT+CMGS=\”+XXXXXXXXXXX\”\r", 1);
-    mrtDelay(1000);
+    GSM_send_data("AT+CMGF=1\r", 1); //
+    GSM_send_data("AT+CMGS=\"+XXXXXXXXXX\"\r", 1);
+    //mrtDelay(1000);
     GSM_send_data(data_temp, 1);
     GSM_send_data("\r\n", 1);
-    mrtDelay(500);
+    //mrtDelay(500);
     uart1SendByte(0x1A);
     
     
     //Else GPRS + then send as data
     
     //Disconnect and turn off Modem
-    LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
+    //LPC_GPIO_PORT->CLR0 = 1 << GSM_PWR;
     
     //
 }
@@ -309,15 +321,9 @@ void GSM_upload(){
 int main(void)
 {
 
-#ifdef DEBUG
+#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
     // Initialise the UART0 block for printf output
     uart0Init(115200);
-#endif
-
-#ifdef GSM
-    uart1Init(115200);
-    
-    GSM_AT();
 #endif
     
     // Configure the multi-rate timer for 1ms ticks
@@ -334,21 +340,38 @@ int main(void)
     
     RFM69_init();
     
-#ifdef DEBUG
+#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
     mrtDelay(100);
     printf("Node Booted\r\n");
     mrtDelay(100);
 #endif
     
-#ifdef DEBUG
+    uart1Init(115200);
+    
+    GSM_On();
+    
+    //GSM_AT();
+
+    
+#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
     printf("Node initialized, version %s\r\n",GIT_VER);
 #endif
     
     //Seed random number generator, we can use our 'unique' ID
     random_output = NODE_ID[0] + NODE_ID[1] + NODE_ID[2];
 
+    mrtDelay(5000);
+    
+    GSM_AT();
+    mrtDelay(5000);
+    
+    GSM_upload();
 
     while(1) {
+
+
+
+        GSM_AT();
         
         incrementPacketCount();
         
@@ -373,15 +396,15 @@ int main(void)
 #ifdef DEBUG
             n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
 #else
-            n = sprintf(data_temp, "%d%cT%dR%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%dR%dX%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, rx_packets, NODE_ID);
 #endif
         }
         
         transmitData(n);
+        GSM_upload();
 
         awaitData(TX_GAP);
     
          }
     
 }
- 
