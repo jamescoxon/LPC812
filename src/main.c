@@ -43,7 +43,7 @@
 #include "spi.h"
 #include "rfm69.h"
 
-#ifdef DEBUG
+#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
     #include "uart.h"
 #endif
 
@@ -239,7 +239,7 @@ int main(void)
     LPC_SYSCON->BODCTRL = 0x11;  //Should be set to Level 1 (Assertion 2.3V, De-assertion 2.4V) reset
 #endif
 
-#ifdef DEBUG
+#if defined(GATEWAY) || defined(DEBUG)
     // Initialise the UART0 block for printf output
     uart0Init(115200);
 #endif
@@ -254,7 +254,7 @@ int main(void)
     // Configure the switch matrix (setup pins for UART0 and SPI)
     configurePins();
     
-    RFM69_init();
+    
     
 #ifdef DEBUG
     mrtDelay(100);
@@ -262,6 +262,7 @@ int main(void)
     mrtDelay(100);
 #endif
 
+    RFM69_init();
     
 #ifdef ZOMBIE_MODE
     //This is to allow the setup to recover from the initial boot and
@@ -281,6 +282,7 @@ int main(void)
 
     while(1) {
 
+        /*
 #ifdef ZOMBIE_MODE
         adc_result = acmpVccEstimate();
         // Before transmitting if the input V is too low we could sleep again
@@ -288,11 +290,9 @@ int main(void)
             sleepRadio();
         }
 #endif
+*/
         
-#ifdef DEBUG
-        printf("ADC: %d\r\n", adc_result);
-        
-#endif
+
         
         incrementPacketCount();
         
@@ -302,13 +302,45 @@ int main(void)
         
         //Create the packet
         int int_temp;
-
-#ifndef ZOMBIE_MODE
+#ifdef ZOMBIE_MODE
+        //This is to allow the setup to recover from the initial boot and
+        // avoid a loop
+        RFM69_setMode(RFM69_MODE_SLEEP);
+        init_sleep();
+        sleepMicro(10000);
+#endif
+        
         int_temp = RFM69_readTemp(); // Read transmitter temperature
+        
+        
         rx_rssi = RFM69_lastRssi();
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
+        
+#ifdef ZOMBIE_MODE
+        //This is to allow the setup to recover from the initial boot and
+        // avoid a loop
+        RFM69_setMode(RFM69_MODE_SLEEP);
+        init_sleep();
+        sleepMicro(10000);
+#endif
+    
+#ifdef ZOMBIE_MODE
+        adc_result = acmpVccEstimate();
+        //sleepMicro(20000);
+#endif
+        
+#ifdef DEBUG
+        printf("ADC: %d\r\n", adc_result);
+        
+#endif
+#ifdef ZOMBIE_MODE
+        //This is to allow the setup to recover from the initial boot and
+        // avoid a loop
+        RFM69_setMode(RFM69_MODE_SLEEP);
+        init_sleep();
+        sleepMicro(10000);
 #endif
 
         if(data_count == 97) {
@@ -317,7 +349,8 @@ int main(void)
         else {
             
 #ifdef DEBUG
-            n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
+            //n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 #else

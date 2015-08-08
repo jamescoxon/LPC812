@@ -232,22 +232,28 @@ void GSM_get_data(uint16_t timeout){
     uint16_t x = 0;
     
     while (x < timeout){
-        if(UART0_available() > 0){
-            for(i=0; i<serialBuffer_write; i++){
-                gsm_buf[i] = serialBuffer[i];
+        if(UART1_available() > 0){
+            for(i=0; i<serial1Buffer_write; i++){
+                gsm_buf[i] = serial1Buffer[i];
                 if (gsm_buf[i] == '\r'){
                     return;
                 }
             }
-            serialBuffer_write = 0;
+            serial1Buffer_write = 0;
         }
         mrtDelay(1);
         x++;
     }
 }
 
+void GSM_send_data(char *command, uint8_t uartport){
+    uint8_t data_length = strlen(command);
+    
+    uartSend(command, data_length, uartport);
+}
+
 uint8_t GSM_AT(){
-    printf("AT\r");
+    GSM_send_data("AT\r", 1);
     GSM_get_data(1000);
     if (gsm_buf[0] == 'O' && gsm_buf[1] == 'K'){
         return 1;
@@ -273,7 +279,6 @@ void GSM_On(){
 }
 
 
-
 void GSM_upload(){
     //Turn on Modem and check has booted
     GSM_On();
@@ -283,12 +288,13 @@ void GSM_upload(){
     //Check whether GPRS/3G
     
     //If GSM send as a SMS
-    printf("AT+CMGF=1"); //
-    printf("AT+CMGS=\”+XXXXXXXXXXX\”\r");
+    GSM_send_data("AT+CMGF=1", 1); //
+    GSM_send_data("AT+CMGS=\”+XXXXXXXXXXX\”\r", 1);
     mrtDelay(1000);
-    printf("%s|%d\r\n",data_temp, RFM69_lastRssi());
+    GSM_send_data(data_temp, 1);
+    GSM_send_data("\r\n", 1);
     mrtDelay(500);
-    uart0SendByte(0x1A);
+    uart1SendByte(0x1A);
     
     
     //Else GPRS + then send as data
@@ -306,6 +312,12 @@ int main(void)
 #ifdef DEBUG
     // Initialise the UART0 block for printf output
     uart0Init(115200);
+#endif
+
+#ifdef GSM
+    uart1Init(115200);
+    
+    GSM_AT();
 #endif
     
     // Configure the multi-rate timer for 1ms ticks
