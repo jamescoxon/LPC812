@@ -306,7 +306,7 @@ void GSM_upload(){
     
     //If GSM send as a SMS
     GSM_send_data("AT+CMGF=1\r", 1); //
-    GSM_send_data("AT+CMGS=\"+447748628528\"\r", 1);
+    GSM_send_data("AT+CMGS=\"+xxxxxxxxx\"\r", 1);
     //mrtDelay(1000);
     GSM_send_data(data_temp, 1);
     GSM_send_data("  ", 1);
