@@ -47,9 +47,14 @@
     #include "uart.h"
 #endif
 
+#ifdef GPS
+    #include "gps.h"
+#endif
+
 #ifdef ZOMBIE
     #include "zombie.h"
 #endif
+
 
 char data_temp[66];
 
@@ -93,19 +98,17 @@ void transmitData(uint8_t i) {
         printf("rx: %s|0\r\n", data_temp);
 #endif
 
-#ifdef ZOMBIE_MODE
     // Transmit the data (need to include the length of the packet and power in dbmW)
     RFM69_send(data_temp, i, POWER_OUTPUT);
-
-
+    
+#ifdef ZOMBIE_MODE
+    //Ensure we are in Sleep mode to save power
     RFM69_setMode(RFM69_MODE_SLEEP);
 #else
-    
-    // Transmit the data (need to include the length of the packet and power in dbmW)
-    RFM69_send(data_temp, i, POWER_OUTPUT);
-    
     //Ensure we are in RX mode
     RFM69_setMode(RFM69_MODE_RX);
+    
+    mrtDelay(500);
 #endif
 
 }
@@ -239,9 +242,9 @@ int main(void)
     LPC_SYSCON->BODCTRL = 0x11;  //Should be set to Level 1 (Assertion 2.3V, De-assertion 2.4V) reset
 #endif
 
-#if defined(GATEWAY) || defined(DEBUG)
+#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
     // Initialise the UART0 block for printf output
-    uart0Init(115200);
+    uart0Init(9600);
 #endif
     
     // Configure the multi-rate timer for 1ms ticks
@@ -253,8 +256,6 @@ int main(void)
     
     // Configure the switch matrix (setup pins for UART0 and SPI)
     configurePins();
-    
-    
     
 #ifdef DEBUG
     mrtDelay(100);
@@ -279,21 +280,12 @@ int main(void)
     //Seed random number generator, we can use our 'unique' ID
     random_output = NODE_ID[0] + NODE_ID[1] + NODE_ID[2];
 
-
+#ifdef GPS
+    setupGPS();
+#endif
+    
     while(1) {
 
-        /*
-#ifdef ZOMBIE_MODE
-        adc_result = acmpVccEstimate();
-        // Before transmitting if the input V is too low we could sleep again
-        if (adc_result < 3100 || adc_result > 10000) {
-            sleepRadio();
-        }
-#endif
-*/
-        
-
-        
         incrementPacketCount();
         
         //Clear buffer
@@ -302,9 +294,9 @@ int main(void)
         
         //Create the packet
         int int_temp;
+        
 #ifdef ZOMBIE_MODE
-        //This is to allow the setup to recover from the initial boot and
-        // avoid a loop
+        //Sleep Mode
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
@@ -312,15 +304,13 @@ int main(void)
         
         int_temp = RFM69_readTemp(); // Read transmitter temperature
         
-        
         rx_rssi = RFM69_lastRssi();
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
         
 #ifdef ZOMBIE_MODE
-        //This is to allow the setup to recover from the initial boot and
-        // avoid a loop
+        //Sleep Mode
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
@@ -336,8 +326,7 @@ int main(void)
         
 #endif
 #ifdef ZOMBIE_MODE
-        //This is to allow the setup to recover from the initial boot and
-        // avoid a loop
+        //Sleep Mode
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
@@ -353,6 +342,10 @@ int main(void)
             n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
+#elif defined(GPS)
+            gps_get_position();
+            mrtDelay(500);
+            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, NODE_ID);
 #else
             n = sprintf(data_temp, "%d%cT%dR%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, NODE_ID);
 #endif

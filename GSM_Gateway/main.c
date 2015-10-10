@@ -42,13 +42,15 @@
 #include "mrt.h"
 #include "spi.h"
 #include "rfm69.h"
+#include "string.h"
 
 #if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
 #include "uart.h"
 #endif
 
 
-char data_temp[66] = "test";
+char data_temp[66] = "AI0";
+char old_string[66];
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
@@ -143,7 +145,10 @@ inline void processData(uint32_t len) {
         
 #ifdef GATEWAY
         printf("rx: %s|%d\r\n",data_temp, RFM69_lastRssi());
+        
 #endif
+        strcpy(old_string, data_temp);
+        
         //Reduce the repeat value
         data_temp[0] = data_temp[0] - 1;
         //Now add , and end line and let string functions do the rest
@@ -301,9 +306,11 @@ void GSM_upload(){
     
     //If GSM send as a SMS
     GSM_send_data("AT+CMGF=1\r", 1); //
-    GSM_send_data("AT+CMGS=\"+XXXXXXXXXX\"\r", 1);
+    GSM_send_data("AT+CMGS=\"+447748628528\"\r", 1);
     //mrtDelay(1000);
     GSM_send_data(data_temp, 1);
+    GSM_send_data("  ", 1);
+    GSM_send_data(old_string, 1);
     GSM_send_data("\r\n", 1);
     //mrtDelay(500);
     uart1SendByte(0x1A);
