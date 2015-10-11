@@ -300,38 +300,21 @@ int main(void)
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
-#endif
-        
+        adc_result = acmpVccEstimate();
+        sleepMicro(10000);
+#else
         int_temp = RFM69_readTemp(); // Read transmitter temperature
         
         rx_rssi = RFM69_lastRssi();
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
-        
-#ifdef ZOMBIE_MODE
-        //Sleep Mode
-        RFM69_setMode(RFM69_MODE_SLEEP);
-        init_sleep();
-        sleepMicro(10000);
-#endif
-    
-#ifdef ZOMBIE_MODE
-        adc_result = acmpVccEstimate();
-        //sleepMicro(20000);
 #endif
         
 #ifdef DEBUG
         printf("ADC: %d\r\n", adc_result);
         
 #endif
-#ifdef ZOMBIE_MODE
-        //Sleep Mode
-        RFM69_setMode(RFM69_MODE_SLEEP);
-        init_sleep();
-        sleepMicro(10000);
-#endif
-
         if(data_count == 97) {
             n = sprintf(data_temp, "%d%cL%s[%s]", NUM_REPEATS, data_count, LOCATION_STRING, NODE_ID);
         }
@@ -354,7 +337,27 @@ int main(void)
         transmitData(n);
 
 #ifdef ZOMBIE_MODE
-        sleepRadio();
+        //Sleep Mode - allow us to recover from the tx
+        RFM69_setMode(RFM69_MODE_SLEEP);
+        init_sleep();
+        sleepMicro(10000);
+        
+        uint8_t y = 0;
+        uint8_t short_gap = TX_GAP / 10;
+        
+        while (y <= short_gap) {
+            adc_result = acmpVccEstimate();
+            
+            if (adc_result >= 2536){
+                awaitData(10);
+            }
+            else {
+                RFM69_setMode(RFM69_MODE_SLEEP);
+                init_sleep();
+                sleepMicro(1000);
+            }
+            y++;
+        }
 #else
         awaitData(TX_GAP);
 #endif
