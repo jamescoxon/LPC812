@@ -59,6 +59,7 @@
 char data_temp[66];
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
+uint8_t perc_rx = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
 /**
@@ -324,7 +325,7 @@ int main(void)
             //n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
             n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 #elif defined(ZOMBIE_MODE)
-            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, perc_rx, NODE_ID);
 #elif defined(GPS)
             gps_get_position();
             mrtDelay(500);
@@ -343,21 +344,24 @@ int main(void)
         sleepMicro(10000);
         
         uint8_t y = 0;
-        uint8_t short_gap = TX_GAP / 10;
+        perc_rx = 0;
+        uint8_t short_gap = TX_GAP / 20;
         
-        while (y <= short_gap) {
+        while (y < short_gap) {
             adc_result = acmpVccEstimate();
             
             if (adc_result >= 2536){
-                awaitData(10);
+                perc_rx++;
+                awaitData(20); //2 seconds
             }
             else {
                 RFM69_setMode(RFM69_MODE_SLEEP);
                 init_sleep();
-                sleepMicro(1000);
+                sleepMicro(2000); //2 seconds
             }
             y++;
         }
+        perc_rx = (perc_rx / short_gap) * 100;
 #else
         awaitData(TX_GAP);
 #endif
