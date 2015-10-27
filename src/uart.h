@@ -57,13 +57,20 @@ extern "C" {
 
 void uart0Init     (uint32_t baudRate);
 void uart0SendChar (char buffer);
-void uart0Send     (char *buffer, uint32_t length);
+void uartSend     (char *buffer, uint32_t length, uint8_t uartPort);
 char uart0ReceiveChar();
 void UART0_printBuffer();
+    
+void uart1Init     (uint32_t baudRate);
+void uart1SendChar (char buffer);
     
 char serialBuffer[64];
 uint8_t serialBuffer_read;
 uint8_t serialBuffer_write;
+    
+char serial1Buffer[64];
+uint8_t serial1Buffer_read;
+uint8_t serial1Buffer_write;
 
 #ifdef __cplusplus
 }

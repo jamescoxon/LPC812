@@ -87,11 +87,17 @@ void uart0SendByte(uint8_t buffer)
     LPC_USART0->TXDATA = buffer;
 }
 
-void uart0Send(char *buffer, uint32_t length)
+void uartSend(char *buffer, uint32_t length, uint8_t uartPort)
 {
   while (length != 0)
   {
-    uart0SendChar(*buffer);
+      if (uartPort == 1) {
+          uart1SendChar(*buffer);
+      }
+      else {
+          uart0SendChar(*buffer);
+      }
+      
     buffer++;
     length--;
   }
@@ -139,4 +145,76 @@ void UART0_printBuffer(){
     serialBuffer_write = 0;
 }
 
+void uart1Init(uint32_t baudRate)
+{
+    uint32_t clk;
+    const uint32_t UARTCLKDIV=1;
+    
+    /* Setup the clock and reset UART1 */
+    LPC_SYSCON->UARTCLKDIV = UARTCLKDIV;
+    NVIC_DisableIRQ(UART1_IRQn);
+    LPC_SYSCON->SYSAHBCLKCTRL |=  (1 << 15); //15 is uart1
+    LPC_SYSCON->PRESETCTRL    &= ~(1 << 4);  // 4 is uart1
+    LPC_SYSCON->PRESETCTRL    |=  (1 << 4);
+    
+    /* Configure UART1 */
+    clk = __MAIN_CLOCK/UARTCLKDIV;
+    LPC_USART1->CFG = UART_DATA_LENGTH_8 | UART_PARITY_NONE | UART_STOP_BIT_1;
+    LPC_USART1->BRG = clk / 16 / baudRate - 1;
+    LPC_SYSCON->UARTFRGDIV = 0xFF;
+    LPC_SYSCON->UARTFRGMULT = (((clk / 16) * (LPC_SYSCON->UARTFRGDIV + 1)) /
+                               (baudRate * (LPC_USART1->BRG + 1))) - (LPC_SYSCON->UARTFRGDIV + 1);
+    
+    /* Clear the status bits */
+    LPC_USART1->STAT = UART_STATUS_CTSDEL | UART_STATUS_RXBRKDEL;
+    
+    /* enable rx interrupts (http://jaromir.xf.cz/phone/phone1.html) */
+    LPC_USART1->INTENSET = (1 << 0);
+    
+    /* Enable UART1 interrupt */
+    NVIC_EnableIRQ(UART1_IRQn);
+    
+    /* Enable UART1 */
+    LPC_USART1->CFG |= UART_ENABLE;
+    
+    serial1Buffer_read = 0;
+    serial1Buffer_write = 0;
+}
+
+void uart1SendChar(char buffer)
+{
+    /* Wait until we're ready to send */
+    while (!(LPC_USART1->STAT & UART_STATUS_TXRDY));
+    LPC_USART1->TXDATA = buffer;
+}
+
+void uart1SendByte(uint8_t buffer)
+{
+    /* Wait until we're ready to send */
+    while (!(LPC_USART1->STAT & UART_STATUS_TXRDY));
+    LPC_USART1->TXDATA = buffer;
+}
+
+uint8_t UART1_available(){
+    return serial1Buffer_write;
+}
+
+// (http://jaromir.xf.cz/phone/phone1.html)
+void UART1_IRQHandler(void)
+{
+    char temp;
+    int intstat = LPC_USART1->INTSTAT;
+    if(intstat & (1 << 0))
+    {
+        serial1Buffer[serial1Buffer_write] = LPC_USART1->RXDATA;
+        
+        if(serial1Buffer_write < 64){
+            serial1Buffer_write++;
+        }
+        else{
+            serial1Buffer_write = 0;
+        }
+        //uart0SendChar(temp); //Echo characters to UART0
+    }
+}
 

@@ -59,9 +59,10 @@
 char data_temp[66];
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
-uint8_t perc_rx = 0;
+uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
+float float_adc_result;
 /**
  * Setup all pins in the switch matrix of the LPC812
  */
@@ -73,6 +74,9 @@ void configurePins() {
     /* U0_TXD */
     /* U0_RXD */
     LPC_SWM->PINASSIGN0 = 0xffff0004UL;
+    /* U1_TXD */
+    /* U1_RXD */
+    LPC_SWM->PINASSIGN1 = 0xff0c0dffUL;
     /* SPI0_SCK */
     LPC_SWM->PINASSIGN3 = 0x01ffffffUL;
     /* SPI0_MOSI */
@@ -243,9 +247,14 @@ int main(void)
     LPC_SYSCON->BODCTRL = 0x11;  //Should be set to Level 1 (Assertion 2.3V, De-assertion 2.4V) reset
 #endif
 
-#if defined(GATEWAY) || defined(DEBUG) || defined(GPS)
+#if defined(GATEWAY) || defined(DEBUG)
     // Initialise the UART0 block for printf output
     uart0Init(9600);
+#endif
+    
+#ifdef GPS
+    // Initialise UART1 for use with GPS
+    uart1Init(9600);
 #endif
     
     // Configure the multi-rate timer for 1ms ticks
@@ -302,6 +311,7 @@ int main(void)
         init_sleep();
         sleepMicro(10000);
         adc_result = acmpVccEstimate();
+        float_adc_result = adc_result / 1000;
         sleepMicro(10000);
 #else
         int_temp = RFM69_readTemp(); // Read transmitter temperature
@@ -321,11 +331,12 @@ int main(void)
         }
         else {
             
-#ifdef DEBUG
+//#ifdef DEBUG
             //n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
-            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
-#elif defined(ZOMBIE_MODE)
-            n = sprintf(data_temp, "%d%cT%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, perc_rx, NODE_ID);
+//            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
+//#elif defined(ZOMBIE_MODE)
+#ifdef ZOMBIE_MODE
+            n = sprintf(data_temp, "%d%cT%dV%fX%d[%s]", NUM_REPEATS, data_count, int_temp, float_adc_result, perc_rx, NODE_ID);
 #elif defined(GPS)
             gps_get_position();
             mrtDelay(500);
@@ -344,7 +355,7 @@ int main(void)
         sleepMicro(10000);
         
         uint8_t y = 0;
-        perc_rx = 0;
+        perc_rx = 0, perc_sleep = 0;
         uint8_t short_gap = TX_GAP / 20;
         
         while (y < short_gap) {
@@ -355,13 +366,14 @@ int main(void)
                 awaitData(20); //2 seconds
             }
             else {
+                perc_sleep = perc_sleep + 3;
                 RFM69_setMode(RFM69_MODE_SLEEP);
                 init_sleep();
-                sleepMicro(2000); //2 seconds
+                sleepMicro(6000); //6 seconds
             }
             y++;
         }
-        perc_rx = (perc_rx / short_gap) * 100;
+        perc_rx = (perc_rx / (perc_rx + perc_sleep)) * 100;
 #else
         awaitData(TX_GAP);
 #endif
