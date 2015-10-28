@@ -4,6 +4,8 @@ void gps_ubx_checksum(uint8_t* data, uint8_t len, uint8_t* cka,
                       uint8_t* ckb);
 uint8_t _gps_verify_checksum(uint8_t* data, uint8_t len);
 void sendUBX(uint8_t *MSG, uint8_t len);
+void gps_on();
+void gps_off();
 void setupGPS();
 uint8_t gps_check_nav(void);
 void gps_get_data();

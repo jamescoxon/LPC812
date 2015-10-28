@@ -294,6 +294,10 @@ int main(void)
     setupGPS();
 #endif
     
+#if defined(GPS) && defined(ZOMBIE_MODE)
+    gps_off();
+#endif
+    
     while(1) {
 
         incrementPacketCount();
@@ -335,17 +339,40 @@ int main(void)
             //n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
 //            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
 //#elif defined(ZOMBIE_MODE)
-#ifdef ZOMBIE_MODE
-            n = sprintf(data_temp, "%d%cT%dV%fX%d[%s]", NUM_REPEATS, data_count, int_temp, float_adc_result, perc_rx, NODE_ID);
-#elif defined(GPS)
+            
+#if defined(GPS) && defined(ZOMBIE_MODE)
+            if(data_count == 122) {
+                int gps_timeout = 0;
+                //Turn on GPS module
+                gps_on();
+                
+                //Setup GPS
+                setupGPS();
+                
+                //Wait for a lock
+                while (lock == 0 && gps_timeout < 300){
+                    gps_check_lock();
+                    mrtDelay(1000);
+                    gps_timeout++;
+                }
+            }
+#endif
+            
+#ifdef GPS
             gps_get_position();
             mrtDelay(500);
-            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, NODE_ID);
+            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dX%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, lock, NODE_ID);
+#elif defined(ZOMBIE_MODE)
+            n = sprintf(data_temp, "%d%cT%dV%fX%d[%s]", NUM_REPEATS, data_count, int_temp, float_adc_result, perc_rx, NODE_ID);
 #else
             n = sprintf(data_temp, "%d%cT%dR%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, NODE_ID);
 #endif
         }
-        
+
+#if defined(GPS) && defined(ZOMBIE_MODE)
+        gps_off();
+#endif
+
         transmitData(n);
 
 #ifdef ZOMBIE_MODE

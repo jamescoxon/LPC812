@@ -48,6 +48,18 @@ void sendUBX(uint8_t *MSG, uint8_t len)
     }
 }
 
+//Info from https://ukhas.org.uk/guides:ublox_psm
+void gps_on(){
+    static uint8_t GPSon[] = {0xB5, 0x62, 0x06, 0x04, 0x04, 0x00, 0x00, 0x00,0x09, 0x00, 0x17, 0x76};
+    sendUBX(GPSon, sizeof(GPSon)/sizeof(uint8_t));
+}
+
+void gps_off(){
+    //Restart GPS
+    static uint8_t GPSoff[] = {0xB5, 0x62, 0x06, 0x04, 0x04, 0x00, 0x00, 0x00,0x08, 0x00, 0x16, 0x74};
+    sendUBX(GPSoff, sizeof(GPSoff)/sizeof(uint8_t));
+}
+
 void setupGPS(){
     mrtDelay(5000);
     //Turning off all GPS NMEA strings apart on the uBlox module
