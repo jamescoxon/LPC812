@@ -63,6 +63,7 @@ uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
 float float_adc_result;
+int gps_timeout = 0;
 /**
  * Setup all pins in the switch matrix of the LPC812
  */
@@ -275,6 +276,9 @@ int main(void)
 
     RFM69_init();
     
+    //Seed random number generator, we can use our 'unique' ID
+    random_output = NODE_ID[0] + NODE_ID[1] + NODE_ID[2];
+    
 #ifdef ZOMBIE_MODE
     //This is to allow the setup to recover from the initial boot and
     // avoid a loop
@@ -282,20 +286,20 @@ int main(void)
     init_sleep();
     sleepMicro(20000);
 #endif
-    
-#ifdef DEBUG
-    printf("Node initialized, version %s\r\n",GIT_VER);
-#endif
-    
-    //Seed random number generator, we can use our 'unique' ID
-    random_output = NODE_ID[0] + NODE_ID[1] + NODE_ID[2];
 
 #ifdef GPS
     setupGPS();
 #endif
     
 #if defined(GPS) && defined(ZOMBIE_MODE)
+    //Turn the GPS off as we want to save power
     gps_off();
+    //Turn off Brownout
+    LPC_SYSCON->BODCTRL = 0x01;
+#endif
+    
+#ifdef DEBUG
+    printf("Node initialized, version %s\r\n",GIT_VER);
 #endif
     
     while(1) {
@@ -326,42 +330,35 @@ int main(void)
         floor_rssi = RFM69_sampleRssi();
 #endif
         
-#ifdef DEBUG
-        printf("ADC: %d\r\n", adc_result);
-        
+#if defined(GPS) && defined(ZOMBIE_MODE)
+        if(data_count == 122) {
+            gps_timeout = 0;
+            //Turn on GPS module
+            gps_on();
+            
+            //Setup GPS
+            setupGPS();
+            
+            //Wait for a lock
+            while (lock == 0 && gps_timeout < 300){
+                gps_check_lock();
+                mrtDelay(1000);
+                gps_timeout++;
+            }
+        }
 #endif
+        
         if(data_count == 97) {
             n = sprintf(data_temp, "%d%cL%s[%s]", NUM_REPEATS, data_count, LOCATION_STRING, NODE_ID);
         }
         else {
-            
+     
 //#ifdef DEBUG
             //n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
-//            n = sprintf(data_temp, "%d%cT%dV%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, NODE_ID);
-//#elif defined(ZOMBIE_MODE)
-            
-#if defined(GPS) && defined(ZOMBIE_MODE)
-            if(data_count == 122) {
-                int gps_timeout = 0;
-                //Turn on GPS module
-                gps_on();
-                
-                //Setup GPS
-                setupGPS();
-                
-                //Wait for a lock
-                while (lock == 0 && gps_timeout < 300){
-                    gps_check_lock();
-                    mrtDelay(1000);
-                    gps_timeout++;
-                }
-            }
-#endif
-            
 #ifdef GPS
             gps_get_position();
             mrtDelay(500);
-            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dX%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, lock, NODE_ID);
+            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, lock, gps_timeout, NODE_ID);
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%dV%fX%d[%s]", NUM_REPEATS, data_count, int_temp, float_adc_result, perc_rx, NODE_ID);
 #else
@@ -371,11 +368,18 @@ int main(void)
 
 #if defined(GPS) && defined(ZOMBIE_MODE)
         gps_off();
+        lock = 0;
 #endif
 
         transmitData(n);
 
-#ifdef ZOMBIE_MODE
+#if defined(GPS) && defined(ZOMBIE_MODE)
+        //Sleep Mode - allow us to recover from the tx
+        RFM69_setMode(RFM69_MODE_SLEEP);
+        init_sleep();
+        sleepMicro(30000);
+        
+#elif defined(ZOMBIE_MODE)
         //Sleep Mode - allow us to recover from the tx
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
