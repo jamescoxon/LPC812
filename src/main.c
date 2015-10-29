@@ -293,7 +293,7 @@ int main(void)
     
 #if defined(GPS) && defined(ZOMBIE_MODE)
     //Turn the GPS off as we want to save power
-    gps_off();
+    //gps_off();
     //Turn off Brownout
     LPC_SYSCON->BODCTRL = 0x01;
 #endif
@@ -331,7 +331,7 @@ int main(void)
 #endif
         
 #if defined(GPS) && defined(ZOMBIE_MODE)
-        if(data_count == 122) {
+        if((data_count == 110) || (data_count == 98)) {
             gps_timeout = 0;
             //Turn on GPS module
             gps_on();
@@ -340,7 +340,7 @@ int main(void)
             setupGPS();
             
             //Wait for a lock
-            while (lock == 0 && gps_timeout < 300){
+            while (lock != 3 && gps_timeout < 150){
                 gps_check_lock();
                 mrtDelay(1000);
                 gps_timeout++;
