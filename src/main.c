@@ -313,6 +313,15 @@ int main(void)
         //Create the packet
         int int_temp;
         
+#ifdef ACMPVCC
+        adc_result = acmpVccEstimate();
+        float_adc_result = adc_result / 1000;
+#endif
+        
+#ifdef RFM_TEMP
+        int_temp = RFM69_readTemp(); // Read transmitter temperature
+#endif
+        
 #ifdef ZOMBIE_MODE
         //Sleep Mode
         RFM69_setMode(RFM69_MODE_SLEEP);
@@ -323,16 +332,6 @@ int main(void)
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
-#endif
-        
-#ifdef ACMPVCC
-        adc_result = acmpVccEstimate();
-        float_adc_result = adc_result / 1000;
-        sleepMicro(10000);
-#endif
-        
-#ifdef RFM_TEMP
-        int_temp = RFM69_readTemp(); // Read transmitter temperature
 #endif
         
 
