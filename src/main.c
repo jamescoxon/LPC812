@@ -318,20 +318,27 @@ int main(void)
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
-        adc_result = acmpVccEstimate();
-        float_adc_result = adc_result / 1000;
-        sleepMicro(10000);
 #else
-        int_temp = RFM69_readTemp(); // Read transmitter temperature
-        
         rx_rssi = RFM69_lastRssi();
         // read the rssi threshold before re-sampling noise floor which will change it
         rssi_threshold = RFM69_lastRssiThreshold();
         floor_rssi = RFM69_sampleRssi();
 #endif
         
+#ifdef ACMPVCC
+        adc_result = acmpVccEstimate();
+        float_adc_result = adc_result / 1000;
+        sleepMicro(10000);
+#endif
+        
+#ifdef RFM_TEMP
+        int_temp = RFM69_readTemp(); // Read transmitter temperature
+#endif
+        
+
+        
 #if defined(GPS) && defined(ZOMBIE_MODE)
-        if((data_count == 110) || (data_count == 98)) {
+        if((data_count == 111) || (data_count == 99)) {
             gps_timeout = 0;
             //Turn on GPS module
             gps_on();
@@ -358,7 +365,7 @@ int main(void)
 #ifdef GPS
             gps_get_position();
             mrtDelay(500);
-            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, lock, gps_timeout, NODE_ID);
+            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dV%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, adc_result, lock, gps_timeout, NODE_ID);
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%dV%fX%d[%s]", NUM_REPEATS, data_count, int_temp, float_adc_result, perc_rx, NODE_ID);
 #else
