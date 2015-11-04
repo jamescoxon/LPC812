@@ -55,6 +55,10 @@
     #include "zombie.h"
 #endif
 
+#ifdef ADC
+    #include "adc.h"
+#endif
+
 
 char data_temp[66];
 
@@ -68,6 +72,7 @@ int gps_timeout = 0;
  * Setup all pins in the switch matrix of the LPC812
  */
 void configurePins() {
+#ifdef ADC
     /* Enable SWM clock */
     LPC_SYSCON->SYSAHBCLKCTRL |= (1<<7);
     
@@ -77,7 +82,31 @@ void configurePins() {
     LPC_SWM->PINASSIGN0 = 0xffff0004UL;
     /* U1_TXD */
     /* U1_RXD */
-    LPC_SWM->PINASSIGN1 = 0xff0c0dffUL;
+    LPC_SWM->PINASSIGN1 = 0xff110dffUL;
+    /* SPI0_SCK */
+    LPC_SWM->PINASSIGN3 = 0x10ffffffUL;
+    /* SPI0_MOSI */
+    /* SPI0_MISO */
+    /* SPI0_SSEL */
+    LPC_SWM->PINASSIGN4 = 0xff0f0809UL;
+    
+    /* Pin Assign 1 bit Configuration */
+    /* ACMP_I2 */
+    /* SWCLK */
+    /* SWDIO */
+    /* RESET */
+    LPC_SWM->PINENABLE0 = 0xffffffb1UL;
+#else
+    /* Enable SWM clock */
+    LPC_SYSCON->SYSAHBCLKCTRL |= (1<<7);
+    
+    /* Pin Assign 8 bit Configuration */
+    /* U0_TXD */
+    /* U0_RXD */
+    LPC_SWM->PINASSIGN0 = 0xffff0004UL;
+    /* U1_TXD */
+    /* U1_RXD */
+    LPC_SWM->PINASSIGN1 = 0xff110dffUL;
     /* SPI0_SCK */
     LPC_SWM->PINASSIGN3 = 0x01ffffffUL;
     /* SPI0_MOSI */
@@ -90,7 +119,7 @@ void configurePins() {
     /* SWDIO */
     /* RESET */
     LPC_SWM->PINENABLE0 = 0xffffffb3UL;
-
+#endif
     
 }
 
@@ -250,7 +279,7 @@ int main(void)
 
 #if defined(GATEWAY) || defined(DEBUG)
     // Initialise the UART0 block for printf output
-    uart0Init(9600);
+    uart0Init(115200);
 #endif
     
 #ifdef GPS
@@ -274,6 +303,10 @@ int main(void)
     mrtDelay(100);
 #endif
 
+#ifdef ADC
+    LPC_SYSCON->PDRUNCFG &= ~(( 1  <<  15 )); // power up ACMP
+#endif
+    
     RFM69_init();
     
     //Seed random number generator, we can use our 'unique' ID
@@ -316,6 +349,11 @@ int main(void)
 #ifdef ACMPVCC
         adc_result = acmpVccEstimate();
         float_adc_result = adc_result / 1000;
+#elif defined(ADC)
+        adc_result = (read_adc2()* 136);
+        //printf("ADC: %d\r\n", adc_result);
+        //mrtDelay(1000);
+        
 #endif
         
 #ifdef RFM_TEMP
@@ -414,7 +452,7 @@ int main(void)
 #else
         awaitData(TX_GAP);
 #endif
-    
+        
          }
     
 }
