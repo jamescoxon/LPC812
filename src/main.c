@@ -294,7 +294,7 @@ int main(void)
     LPC_SYSCON->SYSAHBCLKCTRL |= (1 << 7) | (1 << 14) /*| (1 << 6)*//* | (1 << 18)*/
     | (1 << 10) | (1 << 19);
     
-    // Configure the switch matrix (setup pins for UART0 and SPI)
+    // Configure the switch matrix (setup pins for UART0, UART1 and SPI)
     configurePins();
     
 #ifdef DEBUG
@@ -307,6 +307,7 @@ int main(void)
     LPC_SYSCON->PDRUNCFG &= ~(( 1  <<  15 )); // power up ACMP
 #endif
     
+    //Setup Radio
     RFM69_init();
     
     //Seed random number generator, we can use our 'unique' ID
@@ -372,8 +373,6 @@ int main(void)
         floor_rssi = RFM69_sampleRssi();
 #endif
         
-
-        
 #if defined(GPS) && defined(ZOMBIE_MODE)
         if((data_count == 111) || (data_count == 99)) {
             gps_timeout = 0;
@@ -417,7 +416,7 @@ int main(void)
 
         transmitData(n);
 
-#if defined(GPS) && defined(ZOMBIE_MODE)
+#if defined(ZOMBIE_MODE) && defined(GPS)
         //Sleep Mode - allow us to recover from the tx
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
