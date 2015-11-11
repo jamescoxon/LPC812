@@ -316,9 +316,9 @@ int main(void)
 #ifdef ZOMBIE_MODE
     //This is to allow the setup to recover from the initial boot and
     // avoid a loop
-    RFM69_setMode(RFM69_MODE_SLEEP);
-    init_sleep();
-    sleepMicro(20000);
+    //RFM69_setMode(RFM69_MODE_SLEEP);
+    //init_sleep();
+    //sleepMicro(20000);
 #endif
 
 #ifdef GPS
@@ -403,7 +403,7 @@ int main(void)
             mrtDelay(500);
             n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dV%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, adc_result, lock, gps_timeout, NODE_ID);
 #elif defined(ZOMBIE_MODE)
-            n = sprintf(data_temp, "%d%cT%dV%fX%d[%s]", NUM_REPEATS, data_count, int_temp, float_adc_result, perc_rx, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, perc_rx, NODE_ID);
 #else
             n = sprintf(data_temp, "%d%cT%dR%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, NODE_ID);
 #endif
@@ -435,7 +435,7 @@ int main(void)
         while (y < short_gap) {
             adc_result = acmpVccEstimate();
             
-            if (adc_result >= 2536){
+            if (adc_result >= VCC_THRES){
                 perc_rx++;
                 awaitData(20); //2 seconds
             }
@@ -443,7 +443,7 @@ int main(void)
                 perc_sleep = perc_sleep + 3;
                 RFM69_setMode(RFM69_MODE_SLEEP);
                 init_sleep();
-                sleepMicro(6000); //6 seconds
+                sleepMicro(2000); //2 seconds
             }
             y++;
         }
