@@ -6,8 +6,19 @@ Adapted from LPC810_CodeBase
 * GPS code to read Ublox GPS modules
 * Stripped down version of string library
 * Included memcpy
+* One Wire/DS18b20 library borrowed from jdesbonnet
 
-Please remember to edit src/main.c and add your own node ID and location string.
+Please remember to edit src/setting.h and add your own node ID and location string as well as defining the various functions you want to use.
+
+* DEBUG - passes debug data through UART0
+* GATEWAY - passes rx'd data through UART0
+* GPS - allows access to a ublox based GPS on UART1
+* ADC - uses ACMP2 and internal resistor ladder to measure input voltage
+* ZOMBIE_MODE - low power mode where instead of rx'ing between packets sleeps to save power
+* RFM_TEMP - measure RFM69's internal temperature
+* ACMPVCC - use ACMP to read input voltage
+  * VCC_THRES - define mV where switched to rx
+* ONE_WIRE - use the one wire library to read a DS18b20 temperature sensor 
 
 
 LPC810_CodeBase
