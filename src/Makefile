@@ -43,6 +43,7 @@ UKHASNET_OBJS = main.o \
                 mrt.o \
                 printf.o \
                 string.o \
+		onewire.o \
 		adc.o \
 		gps.o \
                 zombie.o \

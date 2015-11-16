@@ -59,6 +59,10 @@
     #include "adc.h"
 #endif
 
+#ifdef ONE_WIRE
+    #include "onewire.h"
+#endif
+
 
 char data_temp[66];
 
@@ -312,14 +316,6 @@ int main(void)
     
     //Seed random number generator, we can use our 'unique' ID
     random_output = NODE_ID[0] + NODE_ID[1] + NODE_ID[2];
-    
-#ifdef ZOMBIE_MODE
-    //This is to allow the setup to recover from the initial boot and
-    // avoid a loop
-    //RFM69_setMode(RFM69_MODE_SLEEP);
-    //init_sleep();
-    //sleepMicro(20000);
-#endif
 
 #ifdef GPS
     setupGPS();
@@ -330,6 +326,10 @@ int main(void)
     //gps_off();
     //Turn off Brownout
     LPC_SYSCON->BODCTRL = 0x01;
+#endif
+    
+#ifdef ONE_WIRE
+    ow_init (OW_PORT,OW_PIN);
 #endif
     
 #ifdef DEBUG
