@@ -7,6 +7,7 @@
 #include "LPC8xx.h"
 
 #include "onewire.h"
+#include "gpio.h"
 
 #include <stdint.h>
 
@@ -77,19 +78,19 @@ void ow_init(int port, int pin) {
 
 void ow_low() {
     // set direction output
-    GPIOSetDir(ow_port, ow_pin, 1);
+    gpioSetDir(ow_port, ow_pin, 1);
     // set low
-    GPIOSetBitValue(ow_port, ow_pin, 0);
+    gpioSetValue(ow_port, ow_pin, 0);
 }
 
 void ow_high() {
     // set direction input (high Z) and let pull-up R bring high
-    GPIOSetDir(ow_port, ow_pin, 0);
+    gpioSetDir(ow_port, ow_pin, 0);
 }
 
 int ow_read() {
-    GPIOSetDir(ow_port, ow_pin, 0);
-    return GPIOGetPinValue(ow_port, ow_pin);
+    gpioSetDir(ow_port, ow_pin, 0);
+    return gpioGetPinValue(ow_port, ow_pin);
 }
 
 /**

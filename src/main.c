@@ -70,7 +70,6 @@ uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 
 uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
-float float_adc_result;
 int gps_timeout = 0;
 /**
  * Setup all pins in the switch matrix of the LPC812
@@ -345,11 +344,10 @@ int main(void)
         uint8_t n;
         
         //Create the packet
-        int int_temp;
+        int32_t ext_temp, int_temp;
         
 #ifdef ACMPVCC
         adc_result = acmpVccEstimate();
-        float_adc_result = adc_result / 1000;
 #elif defined(ADC)
         adc_result = (read_adc2()* 136);
         //printf("ADC: %d\r\n", adc_result);
@@ -359,6 +357,9 @@ int main(void)
         
 #ifdef RFM_TEMP
         int_temp = RFM69_readTemp(); // Read transmitter temperature
+#endif
+#ifdef ONE_WIRE
+        ext_temp = ds18b20_temperature_read();
 #endif
         
 #ifdef ZOMBIE_MODE
