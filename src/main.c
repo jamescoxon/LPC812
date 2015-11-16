@@ -440,7 +440,8 @@ int main(void)
                 awaitData(20); //2 seconds
             }
             else {
-                perc_sleep = perc_sleep + 3;
+                //perc_sleep = perc_sleep + 3;
+                perc_sleep++;
                 RFM69_setMode(RFM69_MODE_SLEEP);
                 init_sleep();
                 sleepMicro(2000); //2 seconds
