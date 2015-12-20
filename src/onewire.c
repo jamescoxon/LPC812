@@ -105,12 +105,12 @@ int ow_bit_read () {
     // The read slow starts with the bus is diven low.
     // We have 15µs from the falling edge read the bus.
     ow_low();
-    mrtDelay(1); // Must be held low for at least 1µs
+    UmrtDelay(1); // Must be held low for at least 1µs
     
     // Bring bus high again. And read within the 15µs time interval
     // (already a few µs used by by now...)
     ow_high();
-    mrtDelay(1);
+    UmrtDelay(1);
     
     //GPIOSetBitValue(0,2, 1); //debug
     int b = ow_read();
@@ -119,7 +119,7 @@ int ow_bit_read () {
     // Read slots must be a minimum of 60µs in duration with a minimum of 1µs
     // recovery time between slots. Rather than monitor bus to check for end
     // of slot, just delay for a period well exceeding the 60µs slot time.
-    mrtDelay(65);
+    UmrtDelay(65);
     
     //GPIOSetBitValue(0,2, 1); //debug
     
@@ -128,14 +128,14 @@ int ow_bit_read () {
 
 int ow_reset() {
     ow_low();
-    mrtDelay(480);
+    UmrtDelay(480);
     ow_high();
-    mrtDelay(70);
+    UmrtDelay(70);
     
     int detect = ow_read();
     ow_high();
     
-    mrtDelay(410);
+    UmrtDelay(410);
     
     return ~detect;
 }
@@ -146,16 +146,16 @@ void ow_bit_write (int b) {
     ow_low();
     if (b) {
         // having trouble getting this in the 1-15µs range. Need better delay mechanism.
-        mrtDelay(1); // max 15µs, min 1µs (?)
+        UmrtDelay(1); // max 15µs, min 1µs (?)
         ow_high();
-        mrtDelay(60);
+        UmrtDelay(60);
     } else {
-        mrtDelay(66);
+        UmrtDelay(66);
         ow_high();
     }
     
     // Recovery time
-    mrtDelay(5);
+    UmrtDelay(5);
 }
 void ow_byte_write (int data) {
     int i;

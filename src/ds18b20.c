@@ -32,12 +32,12 @@ int32_t ds18b20_temperature_read () {
     // Skip ROM command
     ow_byte_write (0xCC);
     
-    mrtDelay(10);
+    UmrtDelay(10);
     
     // Issue Convert command
     ow_byte_write (0x44);
     
-    mrtDelay(800);
+    UmrtDelay(800);
     
     if ( ! ow_reset() ) {
         return -9999;
@@ -45,7 +45,7 @@ int32_t ds18b20_temperature_read () {
     // Skip ROM command
     ow_byte_write (0xCC);
     
-    mrtDelay(10);
+    UmrtDelay(10);
     
     // Issue command to read scratch pad
     ow_byte_write (0xBE);

@@ -75,7 +75,7 @@ int gps_timeout = 0;
  * Setup all pins in the switch matrix of the LPC812
  */
 void configurePins() {
-#ifdef ADC
+#if defined(ADC) || defined(MK2)
     /* Enable SWM clock */
     LPC_SYSCON->SYSAHBCLKCTRL |= (1<<7);
     
@@ -329,6 +329,7 @@ int main(void)
     
 #ifdef ONE_WIRE
     ow_init (OW_PORT,OW_PIN);
+    //printf("One Wire: %d\r\n", ds18b20_rom_read());
 #endif
     
 #ifdef DEBUG
@@ -357,9 +358,12 @@ int main(void)
         
 #ifdef RFM_TEMP
         int_temp = RFM69_readTemp(); // Read transmitter temperature
+        //printf("Temp: %d\r\n",int_temp);
 #endif
+
 #ifdef ONE_WIRE
-        ext_temp = ds18b20_temperature_read();
+        ext_temp = ds18b20_temperature_read() / 1000;
+        //printf("Ext Temp: %d\r\n",ext_temp);
 #endif
         
 #ifdef ZOMBIE_MODE
@@ -397,8 +401,6 @@ int main(void)
         }
         else {
      
-//#ifdef DEBUG
-            //n = sprintf(data_temp, "%d%cT%dR%d,%dC%dX%d,%dV%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, floor_rssi, rx_packets, rx_restarts, rssi_threshold, adc_result, NODE_ID);
 #ifdef GPS
             gps_get_position();
             mrtDelay(500);
@@ -406,7 +408,8 @@ int main(void)
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, perc_rx, NODE_ID);
 #else
-            n = sprintf(data_temp, "%d%cT%dR%d[%s]", NUM_REPEATS, data_count, int_temp, rx_rssi, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%d,%dR%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, NODE_ID);
+            
 #endif
         }
 
@@ -416,6 +419,7 @@ int main(void)
 #endif
 
         transmitData(n);
+        printf("Data: %s\r\n",data_temp);
 
 #if defined(ZOMBIE_MODE) && defined(GPS)
         //Sleep Mode - allow us to recover from the tx
@@ -455,6 +459,5 @@ int main(void)
 #endif
         
          }
-    
 }
  

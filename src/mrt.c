@@ -74,6 +74,17 @@ void mrtInit(uint32_t delay)
 
 void mrtDelay(uint32_t ticks)
 {
+  //ticks = ticks * 1000;
   mrt_counter = 0;
   while(mrt_counter < ticks);
+}
+
+void UmrtDelay(unsigned int ticks)
+{
+    ticks = ticks * 10;
+    asm volatile(
+                 "loop%=: sub %[ctr],#1	\n"
+                 "		 bne loop%=\n"
+                 : [ctr] "+r" (ticks)
+                 );
 }

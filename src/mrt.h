@@ -49,5 +49,6 @@
 void MRT_IRQHandler(void);
 void mrtInit(uint32_t delay);
 void mrtDelay(uint32_t ticks);
+void UmrtDelay(unsigned int ticks);
 
 #endif
