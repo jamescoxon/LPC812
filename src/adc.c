@@ -4,6 +4,8 @@
 #define halt_clk(c) LPC_MRT->Channel[3].INTVAL = (c-3)
 
 #include "adc.h"
+#include "mrt.h"
+#include "settings.h"
 
 /* Use ACMP_2 as a simple 5 bit SAR adc */
 int read_adc2() {
@@ -36,4 +38,27 @@ int read_adc2() {
     return value >> 1;
 }
 
-
+int read_adc3() {
+    int time_count = 0;
+    //Discharge cap (set output low)
+    gpioSetDir(0, ADC_PIN, 1); //Output
+    gpioSetValue(0, ADC_PIN, 0); //Low
+    
+    //Wait for cap to discharge
+    mrtDelay(1000);
+    
+    //Switch to input
+    gpioSetDir(0, ADC_PIN, 0); //Input
+    
+    //Now count until threshold reached
+    while(gpioGetPinValue(0,ADC_PIN) == 0){
+        time_count++;
+        UmrtDelay(1);
+        if (time_count > 1000){
+            break;
+        }
+    }//wait for the pin to go HIGH
+    
+    return time_count;
+    
+}

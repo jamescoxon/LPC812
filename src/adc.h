@@ -4,4 +4,5 @@
 #include "LPC8xx.h"
 
 int read_adc2();
+int read_adc3(); //cap adc
 

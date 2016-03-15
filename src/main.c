@@ -70,7 +70,7 @@ uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 
 uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
-int gps_timeout = 0;
+int gps_timeout = 0, read_value;
 /**
  * Setup all pins in the switch matrix of the LPC812
  */
@@ -272,6 +272,20 @@ void incrementPacketCount(void) {
     }
 }
 
+//Select correct ADC method
+int correct_ADC(){
+    int result = 0;
+#ifdef ACMPVCC
+    result = acmpVccEstimate();
+#elif defined(ADC)
+    result = read_adc3();
+#else
+    result = 0;
+#endif
+    
+    return result;
+}
+
 
 
 int main(void)
@@ -347,14 +361,7 @@ int main(void)
         //Create the packet
         int32_t ext_temp, int_temp;
         
-#ifdef ACMPVCC
-        adc_result = acmpVccEstimate();
-#elif defined(ADC)
-        adc_result = (read_adc2()* 136);
-        //printf("ADC: %d\r\n", adc_result);
-        //mrtDelay(1000);
-        
-#endif
+        adc_result =  correct_ADC();
         
 #ifdef RFM_TEMP
         int_temp = RFM69_readTemp(); // Read transmitter temperature
@@ -363,7 +370,9 @@ int main(void)
 
 #ifdef ONE_WIRE
         ext_temp = ds18b20_temperature_read() / 1000;
-        //printf("Ext Temp: %d\r\n",ext_temp);
+        printf("Ext Temp: %d\r\n",ext_temp);
+        mrtDelay(1000);
+        //gpioSetDir(0, 7, 0);
 #endif
         
 #ifdef ZOMBIE_MODE
@@ -371,6 +380,7 @@ int main(void)
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
+        configurePins();
 #else
         rx_rssi = RFM69_lastRssi();
         // read the rssi threshold before re-sampling noise floor which will change it
@@ -408,7 +418,7 @@ int main(void)
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, perc_rx, NODE_ID);
 #else
-            n = sprintf(data_temp, "%d%cT%d,%dR%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%d,%dR%dV%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, adc_result, NODE_ID);
             
 #endif
         }
@@ -419,26 +429,28 @@ int main(void)
 #endif
 
         transmitData(n);
-        printf("Data: %s\r\n",data_temp);
+        //printf("Data: %s\r\n",data_temp);
 
 #if defined(ZOMBIE_MODE) && defined(GPS)
         //Sleep Mode - allow us to recover from the tx
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(30000);
+        configurePins();
         
 #elif defined(ZOMBIE_MODE)
         //Sleep Mode - allow us to recover from the tx
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
         sleepMicro(10000);
+        configurePins();
         
         uint8_t y = 0;
         perc_rx = 0, perc_sleep = 0;
         uint8_t short_gap = TX_GAP / 20;
         
         while (y < short_gap) {
-            adc_result = acmpVccEstimate();
+            adc_result =  correct_ADC();
             
             if (adc_result >= VCC_THRES){
                 perc_rx++;
@@ -450,6 +462,7 @@ int main(void)
                 RFM69_setMode(RFM69_MODE_SLEEP);
                 init_sleep();
                 sleepMicro(2000); //2 seconds
+                configurePins();
             }
             y++;
         }
@@ -457,7 +470,6 @@ int main(void)
 #else
         awaitData(TX_GAP);
 #endif
-        
          }
 }
  

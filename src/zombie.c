@@ -13,6 +13,15 @@ void init_sleep(){
     //https://github.com/Fadis/lpc810/blob/master/mbed/target/hal/TARGET_NXP/TARGET_LPC81X/sleep.c
     //https://github.com/jdesbonnet/RFM69_LPC812_firmware/blob/master/src/sleep.c
     
+    #define SCK_PIN 16
+    #define SS_PIN 15
+    #define MOSI_PIN 9
+    #define MISO_PIN 8
+    
+    LPC_GPIO_PORT->DIR0 |= 1<<MISO_PIN;
+    
+    LPC_GPIO_PORT->SET0 = (1<<MISO_PIN) | (1<<MOSI_PIN) | (1<<SCK_PIN) | (1<<SS_PIN);
+    
     LPC_SYSCON->SYSAHBCLKCTRL |= 1<<9;  // SYSCTL_CLOCK_WKT
     LPC_PMU->DPDCTRL |= (1<<2)|(1<<3);  // LPOSCEN and LPOSCDPDEN
     LPC_WKT->CTRL = 1<<0;               // WKT_CTRL_CLKSEL
@@ -20,7 +29,8 @@ void init_sleep(){
     NVIC_EnableIRQ(WKT_IRQn);
     
     LPC_SYSCON->STARTERP1 = 1<<15;      // wake up from alarm/wake timer
-    SCB->SCR |= 1<<2;                   // enable SLEEPDEEP mode
+    //SCB->SCR |= 1<<2;                   // enable SLEEPDEEP mode
+    SCB->SCR |= 0x04;
     //SCB->SCR = 0;                     // enable SLEEP (clock remains running, system clock remain in active mode but processor not clocked
     //LPC_PMU->PCON = 3;
     
