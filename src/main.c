@@ -63,6 +63,10 @@
     #include "onewire.h"
 #endif
 
+#ifdef I2C
+    #include "i2c.h"
+#endif
+
 
 char data_temp[66];
 
@@ -70,6 +74,15 @@ uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 
 uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
+
+#ifdef I2C
+    #define MAX_REC_BUFFER	16
+    char I2cRecBuffer [MAX_REC_BUFFER];
+    #define MAX_SEND_BUFFER	9
+    char I2cSendBuffer [MAX_SEND_BUFFER] = {20, 0, 1, 1, 0, 0, 0, 1, 0x40};
+    int I2cBytesReceived, I2cBytesSend, I2cSendStartregister;
+#endif
+
 int gps_timeout = 0, read_value;
 /**
  * Setup all pins in the switch matrix of the LPC812
@@ -92,13 +105,15 @@ void configurePins() {
     /* SPI0_MISO */
     /* SPI0_SSEL */
     LPC_SWM->PINASSIGN4 = 0xff0f0809UL;
+    /* I2C0_SDA */
+    LPC_SWM->PINASSIGN7 = 0x03ffffffUL;
+    /* I2C0_SCL */
+    LPC_SWM->PINASSIGN8 = 0xffffff02UL;
     
     /* Pin Assign 1 bit Configuration */
     /* ACMP_I2 */
-    /* SWCLK */
-    /* SWDIO */
     /* RESET */
-    LPC_SWM->PINENABLE0 = 0xffffffb1UL;
+    LPC_SWM->PINENABLE0 = 0xffffffbdUL;
 #else
     /* Enable SWM clock */
     LPC_SYSCON->SYSAHBCLKCTRL |= (1<<7);
@@ -346,6 +361,15 @@ int main(void)
     //printf("One Wire: %d\r\n", ds18b20_rom_read());
 #endif
     
+#ifdef I2C
+    /* Initialise the I2C block */
+    I2cInit (0, 4);
+    
+    /* Set LPC810 as i2c slave (address) */
+    I2cAsSlave (0xDC);
+    I2cSendStartregister = 0;
+#endif
+    
 #ifdef DEBUG
     printf("Node initialized, version %s\r\n",GIT_VER);
 #endif
@@ -430,6 +454,18 @@ int main(void)
 
         transmitData(n);
         //printf("Data: %s\r\n",data_temp);
+        
+#ifdef I2C
+        // service the i2c connection
+        if (I2cSlaveAdressed ()) {
+            if (I2cMasterWantsToSend ()) {
+                I2cBytesReceived = I2cSlaveReceiving (I2cRecBuffer,  MAX_REC_BUFFER);
+                if (I2cBytesReceived >= 1) I2cSendStartregister = I2cRecBuffer [0];
+            }
+            //if (I2cMasterWantsToReceive ()) I2cBytesSend = I2cSlaveSending (I2cSendBuffer,  MAX_SEND_BUFFER, I2cSendStartregister);
+            if (I2cMasterWantsToReceive ()) I2cBytesSend = I2cSlaveSending (data_temp,  n, I2cSendStartregister);
+        }
+#endif
 
 #if defined(ZOMBIE_MODE) && defined(GPS)
         //Sleep Mode - allow us to recover from the tx

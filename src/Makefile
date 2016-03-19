@@ -43,6 +43,7 @@ UKHASNET_OBJS = main.o \
                 mrt.o \
                 printf.o \
                 string.o \
+		i2c.o \
 		onewire.o \
 		ds18b20.o \
 		adc.o \
