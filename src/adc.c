@@ -59,6 +59,7 @@ int read_adc3() {
         }
     }//wait for the pin to go HIGH
     
+    //time_count = (time_count * -1) + 1000;
     return time_count;
     
 }

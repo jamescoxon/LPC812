@@ -63,10 +63,6 @@
     #include "onewire.h"
 #endif
 
-#ifdef I2C
-    #include "i2c.h"
-#endif
-
 
 char data_temp[66];
 
@@ -74,14 +70,6 @@ uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 
 uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
 int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
-
-#ifdef I2C
-    #define MAX_REC_BUFFER	16
-    char I2cRecBuffer [MAX_REC_BUFFER];
-    #define MAX_SEND_BUFFER	9
-    char I2cSendBuffer [MAX_SEND_BUFFER] = {20, 0, 1, 1, 0, 0, 0, 1, 0x40};
-    int I2cBytesReceived, I2cBytesSend, I2cSendStartregister;
-#endif
 
 int gps_timeout = 0, read_value;
 /**
@@ -294,6 +282,7 @@ int correct_ADC(){
     result = acmpVccEstimate();
 #elif defined(ADC)
     result = read_adc3();
+    result = result * -1;
 #else
     result = 0;
 #endif
@@ -307,8 +296,12 @@ int main(void)
 {
 #ifdef ZOMBIE_MODE
     LPC_SYSCON->BODCTRL = 0x11;  //Should be set to Level 1 (Assertion 2.3V, De-assertion 2.4V) reset
+#else
+    LPC_SYSCON->BODCTRL = 0x13;
 #endif
 
+    
+    
 #if defined(GATEWAY) || defined(DEBUG)
     // Initialise the UART0 block for printf output
     uart0Init(115200);
@@ -359,15 +352,6 @@ int main(void)
 #ifdef ONE_WIRE
     ow_init (OW_PORT,OW_PIN);
     //printf("One Wire: %d\r\n", ds18b20_rom_read());
-#endif
-    
-#ifdef I2C
-    /* Initialise the I2C block */
-    I2cInit (0, 4);
-    
-    /* Set LPC810 as i2c slave (address) */
-    I2cAsSlave (0xDC);
-    I2cSendStartregister = 0;
 #endif
     
 #ifdef DEBUG
@@ -440,7 +424,7 @@ int main(void)
             mrtDelay(500);
             n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dV%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, adc_result, lock, gps_timeout, NODE_ID);
 #elif defined(ZOMBIE_MODE)
-            n = sprintf(data_temp, "%d%cT%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, adc_result, perc_rx, NODE_ID);
+            n = sprintf(data_temp, "%d%cT%d,%dR%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, adc_result, perc_rx, NODE_ID);
 #else
             n = sprintf(data_temp, "%d%cT%d,%dR%dV%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, adc_result, NODE_ID);
             
@@ -455,17 +439,7 @@ int main(void)
         transmitData(n);
         //printf("Data: %s\r\n",data_temp);
         
-#ifdef I2C
-        // service the i2c connection
-        if (I2cSlaveAdressed ()) {
-            if (I2cMasterWantsToSend ()) {
-                I2cBytesReceived = I2cSlaveReceiving (I2cRecBuffer,  MAX_REC_BUFFER);
-                if (I2cBytesReceived >= 1) I2cSendStartregister = I2cRecBuffer [0];
-            }
-            //if (I2cMasterWantsToReceive ()) I2cBytesSend = I2cSlaveSending (I2cSendBuffer,  MAX_SEND_BUFFER, I2cSendStartregister);
-            if (I2cMasterWantsToReceive ()) I2cBytesSend = I2cSlaveSending (data_temp,  n, I2cSendStartregister);
-        }
-#endif
+
 
 #if defined(ZOMBIE_MODE) && defined(GPS)
         //Sleep Mode - allow us to recover from the tx
@@ -506,6 +480,7 @@ int main(void)
 #else
         awaitData(TX_GAP);
 #endif
+
          }
 }
  
