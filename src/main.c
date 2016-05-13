@@ -67,6 +67,10 @@
     #include "pwm.h"
 #endif
 
+#ifdef PID
+    #include "pid.h"
+#endif
+
 
 char data_temp[66];
 
@@ -364,9 +368,14 @@ int main(void)
     init_pwm();
     int current_pwm = 100;
     set_pwm(current_pwm);
-    
 #endif
     
+#ifdef PID
+    pid_data_t pid[0];
+    /* PID settings per sensor (Kp, Ki, Kd) */
+    PID_Controller_Init(&pid[0], 1, 2, 1);
+#endif
+                        
 #ifdef DEBUG
     printf("Node initialized, version %s\r\n",GIT_VER);
 #endif
@@ -387,17 +396,19 @@ int main(void)
         }
 #endif
         
-#ifdef PWM
-        printf("PWM: %d\n", current_pwm);
-        set_pwm(current_pwm);
-        if (current_pwm > 0){
-            current_pwm = current_pwm - 10;
-        }
-        else {
-            current_pwm = 100;
-        }
-        mrtDelay(1000);
-#endif
+//#ifdef PWM
+//        //This is just a test and can be removed,
+//        printf("PWM: %d\n", current_pwm);
+//        set_pwm(current_pwm);
+//        if (current_pwm > 0){
+//            current_pwm = current_pwm - 10;
+//        }
+//        else {
+//            current_pwm = 100;
+//        }
+//        mrtDelay(1000);
+//#endif
+
         
         //Clear buffer
         data_temp[0] = '\0';
@@ -413,6 +424,13 @@ int main(void)
         //printf("Temp: %d\r\n",int_temp);
 #endif
 
+#if defined(PWM) && defined(PID)
+        int16_t out = -1 * PID_Controller_Update(&pid[0], int_temp, 10);
+        printf("Temp: %d, Out: %d\r\n",int_temp, out);
+        set_pwm(out);
+        
+#endif
+        
 #ifdef ONE_WIRE
         ext_temp = ds18b20_temperature_read() / 1000;
         printf("Ext Temp: %d\r\n",ext_temp);
