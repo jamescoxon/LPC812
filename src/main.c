@@ -63,6 +63,10 @@
     #include "onewire.h"
 #endif
 
+#ifdef PWM
+    #include "pwm.h"
+#endif
+
 
 char data_temp[66];
 
@@ -93,6 +97,8 @@ void configurePins() {
     /* SPI0_MISO */
     /* SPI0_SSEL */
     LPC_SWM->PINASSIGN4 = 0xff0f0809UL;
+    /* CTOUT_0 */
+    LPC_SWM->PINASSIGN6 = 0x0effffffUL;
     /* I2C0_SDA */
     LPC_SWM->PINASSIGN7 = 0x03ffffffUL;
     /* I2C0_SCL */
@@ -354,13 +360,44 @@ int main(void)
     //printf("One Wire: %d\r\n", ds18b20_rom_read());
 #endif
     
+#ifdef PWM
+    init_pwm();
+    int current_pwm = 100;
+    set_pwm(current_pwm);
+    
+#endif
+    
 #ifdef DEBUG
     printf("Node initialized, version %s\r\n",GIT_VER);
 #endif
-    
+  
+//================================MAIN LOOP==================================
     while(1) {
 
         incrementPacketCount();
+        
+#ifdef GPS
+        int nav_outcome = gps_check_nav();
+        printf("Nav: %d\r\n",nav_outcome);
+        
+        if (nav_outcome != 6){
+            printf("Reset GPS Setup");
+            setupGPS();
+            
+        }
+#endif
+        
+#ifdef PWM
+        printf("PWM: %d\n", current_pwm);
+        set_pwm(current_pwm);
+        if (current_pwm > 0){
+            current_pwm = current_pwm - 10;
+        }
+        else {
+            current_pwm = 100;
+        }
+        mrtDelay(1000);
+#endif
         
         //Clear buffer
         data_temp[0] = '\0';
@@ -422,7 +459,7 @@ int main(void)
 #ifdef GPS
             gps_get_position();
             mrtDelay(500);
-            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%dV%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, adc_result, lock, gps_timeout, NODE_ID);
+            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%d,%dV%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, floor_rssi, adc_result, nav_outcome,rx_packets, NODE_ID);
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%d,%dR%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, adc_result, perc_rx, NODE_ID);
 #else

@@ -44,6 +44,7 @@ UKHASNET_OBJS = main.o \
                 printf.o \
                 string.o \
 		onewire.o \
+		pwm.o \
 		ds18b20.o \
 		adc.o \
 		gps.o \
