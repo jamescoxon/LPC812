@@ -55,7 +55,7 @@
     #include "zombie.h"
 #endif
 
-#ifdef ADC
+#if defined(ADC) || defined(ACMP_SAR)
     #include "adc.h"
 #endif
 
@@ -69,15 +69,18 @@
 
 #ifdef PID
     #include "pid.h"
+    pid_data_t pid[1];
 #endif
 
 
 char data_temp[66];
+char message[15];
 
 uint8_t data_count = 96; // 'a' - 1 (as the first function will at 1 to make it 'a'
 uint8_t perc_rx = 0, perc_sleep = 0;
 unsigned int rx_packets = 0, random_output = 0, rx_restarts = 0;
-int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0;
+int16_t rx_rssi, floor_rssi, rssi_threshold, adc_result = 0, out;
+int32_t ext_temp, int_temp;
 
 int gps_timeout = 0, read_value;
 /**
@@ -91,18 +94,41 @@ void configurePins() {
     /* Pin Assign 8 bit Configuration */
     /* U0_TXD */
     /* U0_RXD */
-    LPC_SWM->PINASSIGN0 = 0xffff0004UL;
+    //LPC_SWM->PINASSIGN0 = 0xffff0004UL;
     /* U1_TXD */
     /* U1_RXD */
-    LPC_SWM->PINASSIGN1 = 0xff110dffUL;
+    //LPC_SWM->PINASSIGN1 = 0xff110dffUL;
+    /* SPI0_SCK */
+    //LPC_SWM->PINASSIGN3 = 0x10ffffffUL;
+    /* SPI0_MOSI */
+    /* SPI0_MISO */
+    /* SPI0_SSEL */
+    //LPC_SWM->PINASSIGN4 = 0xff0f0809UL;
+    /* I2C0_SDA */
+    //LPC_SWM->PINASSIGN7 = 0x03ffffffUL;
+    /* I2C0_SCL */
+    //LPC_SWM->PINASSIGN8 = 0xffffff02UL;
+    
+    /* Pin Assign 1 bit Configuration */
+    /* ACMP_I2 */
+    /* RESET */
+    //LPC_SWM->PINENABLE0 = 0xffffffbdUL;
+    
+    /* Enable SWM clock */
+    LPC_SYSCON->SYSAHBCLKCTRL |= (1<<7);
+    
+    /* Pin Assign 8 bit Configuration */
+    /* U0_TXD */
+    /* U0_RXD */
+    LPC_SWM->PINASSIGN0 = 0xffff0004UL;
+    /* U1_TXD */
+    LPC_SWM->PINASSIGN1 = 0xffff0dffUL;
     /* SPI0_SCK */
     LPC_SWM->PINASSIGN3 = 0x10ffffffUL;
     /* SPI0_MOSI */
     /* SPI0_MISO */
     /* SPI0_SSEL */
     LPC_SWM->PINASSIGN4 = 0xff0f0809UL;
-    /* CTOUT_0 */
-    LPC_SWM->PINASSIGN6 = 0x0effffffUL;
     /* I2C0_SDA */
     LPC_SWM->PINASSIGN7 = 0x03ffffffUL;
     /* I2C0_SCL */
@@ -262,6 +288,7 @@ void awaitData(int countdown) {
             RFM69_recv(data_temp,  &rx_len);
             data_temp[rx_len - 1] = '\0';
             processData(rx_len);
+            rx_rssi = RFM69_lastRssi();
         }
 
         countdown--;
@@ -287,18 +314,34 @@ void incrementPacketCount(void) {
 
 //Select correct ADC method
 int correct_ADC(){
-    int result = 0;
+    int result;
 #ifdef ACMPVCC
     result = acmpVccEstimate();
 #elif defined(ADC)
     result = read_adc3();
     result = result * -1;
+#elif defined(ACMP_SAR)
+    result = read_adc2();
+    result = result * 100;
 #else
     result = 0;
 #endif
     
     return result;
 }
+
+#ifdef PID
+void update_pid(int32_t temp, int16_t setpoint){
+    out = PID_Controller_Update(&pid[0], temp, setpoint);
+    if (out > 100){
+        out = 100;
+    }
+    if (out < 0){
+        out = 0;
+    }
+    set_pwm(out);
+}
+#endif
 
 
 
@@ -310,8 +353,6 @@ int main(void)
     LPC_SYSCON->BODCTRL = 0x13;
 #endif
 
-    
-    
 #if defined(GATEWAY) || defined(DEBUG)
     // Initialise the UART0 block for printf output
     uart0Init(115200);
@@ -338,7 +379,7 @@ int main(void)
     mrtDelay(100);
 #endif
 
-#ifdef ADC
+#if defined(ADC) || defined(ACMP_SAR)
     LPC_SYSCON->PDRUNCFG &= ~(( 1  <<  15 )); // power up ACMP
 #endif
     
@@ -366,18 +407,21 @@ int main(void)
     
 #ifdef PWM
     init_pwm();
-    int current_pwm = 100;
+    int current_pwm = 0;
     set_pwm(current_pwm);
 #endif
     
 #ifdef PID
-    pid_data_t pid[0];
-    /* PID settings per sensor (Kp, Ki, Kd) */
-    PID_Controller_Init(&pid[0], 1, 2, 1);
+    /* PID settings (Kp, Ki, Kd) */
+    PID_Controller_Init(&pid[0], 10, 10, 1);
 #endif
                         
 #ifdef DEBUG
     printf("Node initialized, version %s\r\n",GIT_VER);
+#endif
+    
+#ifdef LNA_SENS
+    RFM69_SetLnaMode(RF_TESTLNA_SENSITIVE);
 #endif
   
 //================================MAIN LOOP==================================
@@ -385,39 +429,13 @@ int main(void)
 
         incrementPacketCount();
         
-#ifdef GPS
-        int nav_outcome = gps_check_nav();
-        printf("Nav: %d\r\n",nav_outcome);
-        
-        if (nav_outcome != 6){
-            printf("Reset GPS Setup");
-            setupGPS();
-            
-        }
-#endif
-        
-//#ifdef PWM
-//        //This is just a test and can be removed,
-//        printf("PWM: %d\n", current_pwm);
-//        set_pwm(current_pwm);
-//        if (current_pwm > 0){
-//            current_pwm = current_pwm - 10;
-//        }
-//        else {
-//            current_pwm = 100;
-//        }
-//        mrtDelay(1000);
-//#endif
-
-        
         //Clear buffer
         data_temp[0] = '\0';
-        uint8_t n;
+        uint8_t n, m;
         
-        //Create the packet
-        int32_t ext_temp, int_temp;
+        adc_result = correct_ADC();
+        printf("VCC: %d\r\n", adc_result);
         
-        adc_result =  correct_ADC();
         
 #ifdef RFM_TEMP
         int_temp = RFM69_readTemp(); // Read transmitter temperature
@@ -425,16 +443,14 @@ int main(void)
 #endif
 
 #if defined(PWM) && defined(PID)
-        int16_t out = -1 * PID_Controller_Update(&pid[0], int_temp, 10);
-        printf("Temp: %d, Out: %d\r\n",int_temp, out);
-        set_pwm(out);
+        update_pid(int_temp, RADIO_SETPOINT);
         
 #endif
-        
+     
 #ifdef ONE_WIRE
         ext_temp = ds18b20_temperature_read() / 1000;
-        printf("Ext Temp: %d\r\n",ext_temp);
-        mrtDelay(1000);
+        //printf("Ext Temp: %d\r\n",ext_temp);
+        //mrtDelay(1000);
         //gpioSetDir(0, 7, 0);
 #endif
         
@@ -442,7 +458,7 @@ int main(void)
         //Sleep Mode
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
-        sleepMicro(10000);
+        sleepMicro(20000);
         configurePins();
 #else
         rx_rssi = RFM69_lastRssi();
@@ -475,11 +491,20 @@ int main(void)
         else {
      
 #ifdef GPS
+            int nav_outcome = gps_check_nav();
+            //printf("Nav: %d\r\n",nav_outcome);
+            
+            if (nav_outcome != 6){
+                //printf("Reset GPS Setup\r\n");
+                setupGPS();
+                
+            }
             gps_get_position();
             mrtDelay(500);
-            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%d,%dV%dX%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, floor_rssi, adc_result, nav_outcome,rx_packets, NODE_ID);
+            n = sprintf(data_temp, "%d%cL%d,%d,%dT%dR%d,%dX%d,%d,%d[%s]", NUM_REPEATS, data_count, lat, lon, alt, int_temp, rx_rssi, floor_rssi, nav_outcome,rx_packets, out, NODE_ID);
 #elif defined(ZOMBIE_MODE)
             n = sprintf(data_temp, "%d%cT%d,%dR%dV%dX%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, adc_result, perc_rx, NODE_ID);
+            //n = sprintf(data_temp, "%d%cT%d,%dV%d:%s[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, adc_result, message, NODE_ID);
 #else
             n = sprintf(data_temp, "%d%cT%d,%dR%dV%d[%s]", NUM_REPEATS, data_count, int_temp, ext_temp, rx_rssi, adc_result, NODE_ID);
             
@@ -492,9 +517,6 @@ int main(void)
 #endif
 
         transmitData(n);
-        //printf("Data: %s\r\n",data_temp);
-        
-
 
 #if defined(ZOMBIE_MODE) && defined(GPS)
         //Sleep Mode - allow us to recover from the tx
@@ -507,34 +529,48 @@ int main(void)
         //Sleep Mode - allow us to recover from the tx
         RFM69_setMode(RFM69_MODE_SLEEP);
         init_sleep();
-        sleepMicro(10000);
+        sleepMicro(20000);
         configurePins();
         
         uint8_t y = 0;
         perc_rx = 0, perc_sleep = 0;
-        uint8_t short_gap = TX_GAP / 20;
+        uint8_t short_gap = TX_GAP / 10;
         
         while (y < short_gap) {
-            adc_result =  correct_ADC();
+            adc_result = correct_ADC();
+            printf("VCC: %d\r\n", adc_result);
             
             if (adc_result >= VCC_THRES){
                 perc_rx++;
-                awaitData(20); //2 seconds
+                awaitData(10); //1 second
             }
             else {
-                //perc_sleep = perc_sleep + 3;
                 perc_sleep++;
                 RFM69_setMode(RFM69_MODE_SLEEP);
                 init_sleep();
-                sleepMicro(2000); //2 seconds
+                sleepMicro(1000); //1 second
                 configurePins();
             }
             y++;
         }
-        perc_rx = (perc_rx / (perc_rx + perc_sleep)) * 100;
+        
+        //printf("perc_rx: %d, perc_sleep: %d\r\n",perc_rx, perc_sleep);
+        perc_rx = ((perc_rx * 100)/ (perc_rx + perc_sleep));
+        
+#elif defined(PWM) && defined(PID)
+        awaitData(TX_GAP/3);
+        
+        int_temp = RFM69_readTemp(); // Read transmitter temperature
+        update_pid(int_temp, RADIO_SETPOINT);
+        awaitData(TX_GAP/3);
+        
+        int_temp = RFM69_readTemp(); // Read transmitter temperature
+        update_pid(int_temp, RADIO_SETPOINT);
+        awaitData(TX_GAP/3);
 #else
         awaitData(TX_GAP);
 #endif
+
 
          }
 }

@@ -44,9 +44,10 @@ int read_adc3() {
     gpioSetDir(0, ADC_PIN, 1); //Output
     gpioSetValue(0, ADC_PIN, 0); //Low
     
+    printf("Discharging...\r\n");
     //Wait for cap to discharge
     mrtDelay(1000);
-    
+    printf("Switch to Input\r\n");
     //Switch to input
     gpioSetDir(0, ADC_PIN, 0); //Input
     
@@ -59,6 +60,7 @@ int read_adc3() {
         }
     }//wait for the pin to go HIGH
     
+    printf("Done\r\n");
     //time_count = (time_count * -1) + 1000;
     return time_count;
     

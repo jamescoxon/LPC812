@@ -425,6 +425,10 @@
 #define RF_LNA_GAINSELECT_MAXMINUS36    0x05
 #define RF_LNA_GAINSELECT_MAXMINUS48    0x06
 
+// RegTestLna
+#define RF_TESTLNA_NORMAL           0x1B  // Default
+#define RF_TESTLNA_SENSITIVE        0x2D  //
+
 
 // RegRxBw
 #define RF_RXBW_DCCFREQ_000                     0x00
